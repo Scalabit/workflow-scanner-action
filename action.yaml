@@ -32,25 +32,16 @@ runs:
       run: |
         echo "Starting workflow security scan..."
         
-        echo "Preparing secure request payload..."
+        echo "Submitting scan request..."
         
-        # Create JSON payload and pipe directly to curl - no temp files or variables
-        RESPONSE=$(
-          {
-            echo '{'
-            echo "  \"repository\": \"${{ inputs.repository }}\","
-            echo "  \"github_token\": \"${{ inputs.github-token }}\","
-            echo "  \"llm_api_key\": \"${{ inputs.llm-api-key }}\","
-            echo -n "  \"source_base64\": \""
-            tar -czf - . | base64 -w 0  # Stream directly without storing
-            echo '"'
-            echo '}'
-          } | curl -s -w "%{http_code}" -X POST \
-            "${{ inputs.service-url }}/api/scan-workflows" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${{ inputs.api-token }}" \
-            -d @-
-        )
+        # POST request with all data in headers - most secure approach
+        RESPONSE=$(curl -s -w "%{http_code}" -X POST \
+          "${{ inputs.service-url }}/api/scan-workflows" \
+          -H "Authorization: Bearer ${{ inputs.api-token }}" \
+          -H "X-GitHub-Token: ${{ inputs.github-token }}" \
+          -H "X-LLM-API-Key: ${{ inputs.llm-api-key }}" \
+          -H "X-Repository: ${{ inputs.repository }}" \
+          -H "X-Commit-SHA: ${{ github.sha }}")
         
         # Extract HTTP code and response body
         HTTP_CODE="${RESPONSE: -3}"
