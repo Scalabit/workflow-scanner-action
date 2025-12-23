@@ -9,7 +9,8 @@ inputs:
     required: true
   github-token:
     description: 'GitHub token with repo permissions'
-    required: true
+    required: false
+    default: ${{ github.token }}
   llm-api-key:
     description: 'LLM API key (OpenAI, Anthropic, or Gemini)'
     required: true
@@ -28,43 +29,37 @@ outputs:
 runs:
   using: 'composite'
   steps:
-    - name: Scan workflows
+    - name: Checkout repository
+      uses: actions/checkout@v5
+
+    - name: Scan workflows with binary scanner
       id: scan
       shell: bash
       run: |
-        echo "Starting workflow security scan..."
+        echo "Starting workflow security scan with binary scanner..."
         
-        echo "Submitting scan request..."
-        
-        # POST request with data in JSON body - more secure than headers
-        RESPONSE=$(curl -s -w "%{http_code}" -X POST \
-          "${{ inputs.service-url }}/api/scan-workflows-git" \
+        # Validate API token first
+        TOKEN_RESPONSE=$(curl -s -w "%{http_code}" -X POST \
+          "${{ inputs.service-url }}/api/validate-token" \
           -H "Authorization: Bearer ${{ inputs.api-token }}" \
-          -H "Content-Type: application/json" \
-          -d '{
-            "repository": "${{ inputs.repository }}",
-            "github_token": "${{ inputs.github-token }}",
-            "llm_api_key": "${{ inputs.llm-api-key }}",
-            "commit_sha": "${{ github.sha }}"
-          }')
-
-        # Extract HTTP code and response body
-        HTTP_CODE="${RESPONSE: -3}"
-        BODY="${RESPONSE%???}"
+          -H "Content-Type: application/json")
         
-        echo "Response Code: $HTTP_CODE"
+        TOKEN_HTTP_CODE="${TOKEN_RESPONSE: -3}"
         
-        # Handle response
-        if [ "$HTTP_CODE" = "202" ]; then
-          INSTANCE_ID=$(echo "$BODY" | jq -r '.message // ""' | grep -o 'Instance ID: [^"]*' | cut -d' ' -f3 || echo "")
-          if [ -n "$INSTANCE_ID" ]; then
-            echo "instance-id=$INSTANCE_ID" >> $GITHUB_OUTPUT
-            echo "Scan submitted successfully. Instance ID: $INSTANCE_ID"
-          else
-            echo "Scan submitted successfully"
-          fi
-        else
-          ERROR=$(echo "$BODY" | jq -r '.error // "Unknown error occurred"')
-          echo "::error::Scan failed (HTTP $HTTP_CODE): $ERROR"
+        if [ "$TOKEN_HTTP_CODE" != "200" ]; then
+          echo "::error::Invalid API token (HTTP $TOKEN_HTTP_CODE)"
           exit 1
         fi
+        
+        echo "API token validated successfully"
+        
+        # Run the binary scanner with Docker socket access
+        docker run --rm \
+          -v /var/run/docker.sock:/var/run/docker.sock \
+          -e REPOSITORY="${{ inputs.repository }}" \
+          -e GITHUB_TOKEN="${{ inputs.github-token }}" \
+          -e LLM_API_KEY="${{ inputs.llm-api-key }}" \
+          -e COMMIT_SHA="${{ github.sha }}" \
+          -e API_KEY="${{ inputs.api-token }}" \
+          -e SERVICE_URL="${{ inputs.service-url }}" \
+          scalabit/workflow-scanner:latest
