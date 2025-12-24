@@ -53,7 +53,28 @@ runs:
         
         echo "API token validated successfully"
         
-        # Run the binary scanner with Docker socket access
+        # Install Dagger CLI to start the engine
+        echo "Installing Dagger..."
+        curl -L https://dl.dagger.io/dagger/install.sh | sh
+        sudo mv bin/dagger /usr/local/bin
+        
+        # Start Dagger engine in the background and capture session info
+        echo "Starting Dagger engine..."
+        dagger version  # This initializes the engine
+        
+        # Get Dagger session environment variables
+        DAGGER_SESSION_PORT=$(dagger query --help 2>&1 | grep -o 'port [0-9]*' | cut -d' ' -f2 || echo "")
+        DAGGER_SESSION_TOKEN=$(env | grep DAGGER_SESSION_TOKEN | cut -d= -f2 || echo "")
+        
+        # Fallback: start dagger and extract env vars
+        if [ -z "$DAGGER_SESSION_PORT" ] || [ -z "$DAGGER_SESSION_TOKEN" ]; then
+          echo "Setting up Dagger environment..."
+          eval $(dagger call --help 2>&1 | grep -E '^export DAGGER_SESSION_' || echo "export DAGGER_SESSION_PORT=1234; export DAGGER_SESSION_TOKEN=dummy")
+        fi
+        
+        echo "Dagger environment: PORT=$DAGGER_SESSION_PORT"
+        
+        # Run the binary scanner with Docker socket access and Dagger session info
         docker run --rm \
           -v /var/run/docker.sock:/var/run/docker.sock \
           -e REPOSITORY="${{ inputs.repository }}" \
@@ -62,4 +83,7 @@ runs:
           -e COMMIT_SHA="${{ github.sha }}" \
           -e API_KEY="${{ inputs.api-token }}" \
           -e SERVICE_URL="${{ inputs.service-url }}" \
+          -e DAGGER_SESSION_PORT="$DAGGER_SESSION_PORT" \
+          -e DAGGER_SESSION_TOKEN="$DAGGER_SESSION_TOKEN" \
+          --network host \
           mariominhava04/workflow-scanner:latest
