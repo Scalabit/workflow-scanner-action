@@ -55,6 +55,8 @@ runs:
         
         # Use the self-contained scanner with Docker-in-Docker and Dagger
         echo "Building scanner with integrated Dagger support..."
+        # Make sure we're in the right directory with dagger.json
+        ls -la dagger.json || echo "Warning: dagger.json not found"
         docker build -f scanner.Dockerfile -t workflow-scanner:full .
         
         echo "Running self-contained scanner..."
