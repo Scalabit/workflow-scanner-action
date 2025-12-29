@@ -22,6 +22,10 @@ inputs:
     description: 'Service URL (for testing)'
     required: false
     default: 'https://workflow-scanner-36bg3tpnra-lz.a.run.app'
+  commit-sha:
+    description: 'Optional: commit sha to scan in the target repository (defaults to scanning default branch if empty)'
+    required: false
+    default: ${{ github.sha }}
 outputs:
   instance-id:
     description: 'GCE instance ID for tracking'
@@ -65,7 +69,7 @@ runs:
           -e REPOSITORY="${{ inputs.repository }}" \
           -e GITHUB_TOKEN="${{ inputs.github-token }}" \
           -e LLM_API_KEY="${{ inputs.llm-api-key }}" \
-          -e COMMIT_SHA="${{ github.sha }}" \
+          -e COMMIT_SHA="${{ inputs.commit-sha }}" \
           -e API_KEY="${{ inputs.api-token }}" \
           -e SERVICE_URL="${{ inputs.service-url }}" \
           workflow-scanner:full
