@@ -1,4 +1,4 @@
-name: 'Workflow Security Scanner'
+name: 'Remediator-AI'
 description: 'AI agent that analyzes and fixes GitHub workflows'
 branding:
   icon: 'shield'
