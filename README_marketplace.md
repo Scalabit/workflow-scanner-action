@@ -4,20 +4,20 @@ AI-powered GitHub Action that automatically scans your workflows for security vu
 
 ## Features
 
-- **Deep Security Analysis** - Scans GitHub workflows for 40+ security vulnerabilities
+- **Deep Security Analysis** - Scans GitHub workflows using Zizmor
 - **AI-Powered Fixes** - Uses advanced LLMs to generate contextual security fixes
 - **Automated PRs** - Creates pull requests with detailed explanations and fixes
-- **Zero Configuration** - Works out of the box with minimal setup
-- **Fast & Scalable** - Cloud-native processing with Google Batch
+- **Self-Contained** - Runs completely in Docker with integrated Dagger engine
+- **Binary Scanner** - Uses optimized Go binary for fast processing
 - **Detailed Reports** - Comprehensive security analysis and recommendations
 
 ## Quick Start
 
 ### 1. Get Your API Token
 
-1. Visit [Workflow Scanner](https://workflow-scanner-36bg3tpnra-lz.a.run.app)
+1. Visit [remediator](https://remediator.ai/)
 2. Sign in with GitHub OAuth
-3. Subscribe to premium (€10/month)
+3. Subscribe to premium
 4. Copy your API token
 
 ### 2. Add Secrets to Your Repository
@@ -26,8 +26,10 @@ Go to your repository **Settings** -> **Secrets and variables** -> **Actions** a
 
 | Secret Name | Description | Required |
 |-------------|-------------|----------|
-| `WORKFLOW_SCANNER_API_TOKEN` | Your premium API token from the dashboard | Yes |
+| `FS_API_TOKEN` | Your premium API token from remediator | Yes |
 | `LLM_API_KEY` | OpenAI, Anthropic, or Gemini API key | Yes |
+| `DOCKERHUB_USERNAME` | Docker Hub username | Yes |
+| `DOCKERHUB_TOKEN` | Docker Hub token | Yes |  
 
 ### 3. Create Workflow
 
@@ -37,24 +39,32 @@ Create `.github/workflows/security-scan.yml`:
 name: Workflow Security Scan
 
 on:
-  push:
-    branches: [ main, develop ]
   pull_request:
     branches: [ main ]
 
 jobs:
   security-scan:
+    if: ${{ !contains(github.event.pull_request.title, 'Security Audit & Fixes for GitHub Actions Workflows') }}
     runs-on: ubuntu-latest
-    name: Scan workflows for security issues
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
     
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
         
-      - name: Run security scan
-        uses: your-org/workflow-scanner-action@v1
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
         with:
-          api-token: ${{ secrets.WORKFLOW_SCANNER_API_TOKEN }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        
+      - name: Run workflow scanner
+        uses: Scalabit/workflow-scanner-action@main
+        with:
+          api-token: ${{ secrets.FS_API_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           llm-api-key: ${{ secrets.LLM_API_KEY }}
 ```
@@ -63,129 +73,29 @@ jobs:
 
 | Input | Description | Required | Default |
 |-------|-------------|----------|---------|
-| `api-token` | API token from workflow scanner service | Yes | - |
-| `github-token` | GitHub token with repo permissions | Yes | - |
+| `api-token` | API token from remediator service | Yes | - |
+| `github-token` | GitHub token with repo permissions | No | `${{ github.token }}` |
 | `llm-api-key` | LLM API key (OpenAI/Anthropic/Gemini) | Yes | - |
 | `repository` | Repository in format `owner/repo` | No | `${{ github.repository }}` |
-| `service-url` | Service URL (for testing) | No | Production URL |
+
 
 ## Outputs
 
-| Output | Description |
-|--------|-------------|
-| `job-id` | Batch job ID for tracking scan progress |
+This action does not produce any outputs. It scans your workflows and creates a pull request if issues are found.
 
-## Advanced Usage
+## LLM Providers
 
-### Scan on Pull Requests Only
-
-```yaml
-on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-```
-
-### Custom Repository Scanning
-
-```yaml
-- name: Scan specific repository
-  uses: your-org/workflow-scanner-action@v1
-  with:
-    api-token: ${{ secrets.WORKFLOW_SCANNER_API_TOKEN }}
-    github-token: ${{ secrets.GITHUB_TOKEN }}
-    llm-api-key: ${{ secrets.LLM_API_KEY }}
-    repository: "other-org/other-repo"
-```
-
-### Multiple LLM Providers
-
-The action supports multiple AI providers. Set your `LLM_API_KEY` to any of:
-
-- **OpenAI**: `sk-...` (GPT-4, GPT-3.5)
-- **Anthropic**: `sk-ant-...` (Claude)
-- **Google**: Gemini API key
-
-## Security & Privacy
-
-- **Private Processing**: Your code is processed in secure, isolated containers
-- **No Data Storage**: Source code is not stored
-- **Token Security**: All tokens are encrypted and securely transmitted
-- **Audit Logs**: All scans are logged for security compliance
-
-## What We Detect
-
-### High-Risk Vulnerabilities
-- Hardcoded secrets and API keys
-- Unsafe script injection patterns  
-- Privilege escalation risks
-- Insecure artifact handling
-
-### Medium-Risk Issues
-- Missing security headers
-- Overprivileged permissions
-- Insecure checkout configurations
-- Vulnerable dependency patterns
-
-### Best Practice Violations
-- Missing workflow validation
-- Insecure environment usage
-- Poor secret management
-- Inadequate access controls
-
-## Example Output
-
-After scanning, the action will:
-
-1. **Analyze** your workflows for security issues
-2. **Generate** fixes using AI
-3. **Create** a pull request with:
-   - Detailed vulnerability explanations
-   - Secure code replacements
-   - References to security best practices
-   - Risk assessment and impact analysis
-
-### Sample Pull Request
-
-```markdown
-## Security Fixes for GitHub Workflows
-
-This PR addresses 3 security vulnerabilities found in your workflows:
-
-### High Risk: Hardcoded Secret (workflow.yml:15)
-- **Issue**: API key exposed in plain text
-- **Fix**: Moved to GitHub Secrets
-- **Impact**: Prevents credential exposure
-
-### Medium Risk: Script Injection (build.yml:23)  
-- **Issue**: Unsanitized user input in script
-- **Fix**: Added input validation and escaping
-- **Impact**: Prevents malicious code execution
-```
+Supports OpenAI (`sk-...`), Anthropic (`sk-ant-...`), or Gemini API keys.
 
 ## Troubleshooting
 
-### Common Issues
+- **Invalid API token**: Check secrets and subscription status
+- **Permission errors**: Verify GitHub token has repo access
+- **Missing secrets**: Ensure all required secrets are set
 
-#### "Invalid or expired API token"
-- Verify your token in repository secrets
-- Check if your subscription is active
-- Regenerate token from the dashboard
+[Get started at remediator.ai](https://remediator.ai/)
 
-#### "Failed to submit scan"
-- Check if your GitHub token has necessary permissions
-- Verify repository access permissions
-- Ensure LLM API key is valid and has credits
-
-#### "Missing required fields"
-- Confirm all required secrets are set
-- Check secret names match exactly
-- Verify no typos in workflow YAML
-
-
-[Subscribe now](https://workflow-scanner-36bg3tpnra-lz.a.run.app) to get started!
-
+#### Further info also on website
 ---
 
 **Made with your security in mind by [Scalabit](https://scalabit.dev/)**
-
-*Secure your workflows before they secure you!*
