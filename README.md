@@ -1,4 +1,4 @@
-# Workflow Security Scanner
+# Remediator
 
 AI-powered GitHub Action that automatically scans your workflows for security vulnerabilities and creates pull requests with fixes.
 
