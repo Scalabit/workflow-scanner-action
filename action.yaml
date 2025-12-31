@@ -11,6 +11,9 @@ inputs:
     description: 'GitHub token with repo permissions'
     required: false
     default: ${{ github.token }}
+  gitlab-token:
+    description: 'GitLab token with repo permissions'
+    required: true
   llm-api-key:
     description: 'LLM API key (OpenAI, Anthropic, or Gemini)'
     required: true
@@ -64,6 +67,7 @@ runs:
           --privileged \
           -e REPOSITORY="${{ inputs.repository }}" \
           -e GITHUB_TOKEN="${{ inputs.github-token }}" \
+          -e GITLAB_TOKEN="${{ inputs.gitlab-token }}" \
           -e LLM_API_KEY="${{ inputs.llm-api-key }}" \
           -e COMMIT_SHA="${{ github.sha }}" \
           -e API_KEY="${{ inputs.api-token }}" \
